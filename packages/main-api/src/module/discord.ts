@@ -1,15 +1,32 @@
-import express, { Request, Response } from 'express'
+import express, { json, Request, Response } from 'express'
 import fetch from 'node-fetch'
 import btoa from 'btoa'
 import catchAsync from '../util'
+import discord from 'discord.js'
+import { access } from 'fs'
 
 const router = express.Router()
 
+// some env vars that might could be in config.js
 const CLIENT_ID = process.env.CLIENT_ID
 const CLIENT_SECRET = process.env.CLIENT_SECRET
+const BOT_TOKEN = process.env.BOT_TOKEN
+const SERVER_ID = process.env.SERVER_ID
+
+// this role name might could move as well
+const portalerRole = 'portaler'
+
 const redirect = encodeURIComponent(
   'http://localhost:4000/api/discord/callback'
 )
+const client = new discord.Client()
+client.login(BOT_TOKEN)
+
+client.on('ready', () => {
+  console.log('I am ready!')
+})
+
+// client.login()
 
 router.get('/login', (req: Request, res: Response) => {
   res.redirect(
@@ -41,7 +58,22 @@ router.get(
     })
     const jsonresponse = await response.json()
 
-    get_guilds(jsonresponse.access_token)
+    // getGuilds(jsonresponse.access_token)
+    const guildMembers = (await client.guilds.fetch('766363497562898434'))
+      .members
+    const guild = await client.guilds.fetch('766363497562898434')
+
+    const userID = await getMe(jsonresponse.access_token)
+    if (userID === '') {
+      // we should return some error here
+    }
+    // console.log(userID)
+
+    const userResolvable = new discord.User(client, {
+      id: userID,
+    })
+    const user = guild.members.resolve(userResolvable)
+    console.log(user)
 
     // TODO replace this with where your site is servered from or serve from this same server
     res.redirect(`http://localhost:8080/?token=${jsonresponse.access_token}`)
@@ -50,7 +82,7 @@ router.get(
 
 module.exports = router
 
-function get_guilds(access_token: string) {
+function getGuilds(access_token: string) {
   const response = fetch(`https://discord.com/api/users/@me/guilds`, {
     method: 'GET',
     headers: {
@@ -62,3 +94,28 @@ function get_guilds(access_token: string) {
       console.log(jsonData)
     })
 }
+
+const getMe = async (access_token: string): Promise<string> => {
+  const json = await fetch(`https://discord.com/api/users/@me`, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${access_token}`,
+    },
+  }).then((res) => res.json())
+
+  console.log(json)
+  return json.id
+}
+
+;(async () => {
+  // const guildMembers = (await client.guilds.fetch('766363497562898434')).members
+  const guild = await client.guilds.fetch('766363497562898434')
+  // tuna - 200807920827498497
+  // matt - 100057976752082944
+  // bot - 766367559385350154
+  const userResolvable = new discord.User(client, {
+    id: '766367559385350154',
+  })
+  const user = guild.members.resolve(userResolvable)
+  console.log(user)
+})()
